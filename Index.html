@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jarvis Siri Assistant</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #05070c;
+            color: #ffffff;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        /* Siri Pill Container */
+        .siri-pill {
+            width: 90%;
+            max-width: 380px;
+            height: 65px;
+            background: rgba(11, 15, 25, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 35px;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            position: absolute;
+            bottom: 40px;
+        }
+        /* Glowing Orb */
+        .orb-container {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00ffcc, #0055ff);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.6);
+            transition: transform 0.2s ease;
+        }
+        .orb-container:active {
+            transform: scale(0.92);
+        }
+        .orb-inner {
+            width: 30px;
+            height: 30px;
+            background: #0b0f19;
+            border-radius: 50%;
+        }
+        /* Status Text Display */
+        .status-display {
+            flex-grow: 1;
+            margin-left: 14px;
+            overflow: hidden;
+        }
+        #status-text {
+            font-size: 15px;
+            font-weight: 600;
+            color: #ffffff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* Control Button */
+        .control-btn {
+            background: #161b22;
+            border: none;
+            color: #00ffcc;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-left: 8px;
+        }
+        /* Pulsing animation when listening */
+        .listening {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 255, 204, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(0, 255, 204, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 255, 204, 0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="siri-pill" id="pill">
+        <div class="orb-container" id="orb" onclick="toggleListening()">
+            <div class="orb-inner"></div>
+        </div>
+        <div class="status-display">
+            <div id="status-text">Tap orb to speak</div>
+        </div>
+        <button class="control-btn" onclick="togglePersona()">⚡</button>
+    </div>
+
+    <script>
+        let isListening = false;
+        let currentPersona = "Jarvis";
+
+        function updateStatus(text, color = "#00ffcc") {
+            document.getElementById("status-text").innerText = text;
+            document.getElementById("orb").style.background = `linear-gradient(135deg, ${color}, #0055ff)`;
+        }
+
+        function togglePersona() {
+            currentPersona = currentPersona === "Jarvis" ? "Friday" : "Jarvis";
+            let color = currentPersona === "Jarvis" ? "#00ffcc" : "#ff79c6";
+            updateStatus(`${currentPersona} Ready`, color);
+        }
+
+        function toggleListening() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("Speech recognition is not supported in this browser. Try Google Chrome on Android.");
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = function() {
+                isListening = true;
+                document.getElementById("pill").classList.add("listening");
+                updateStatus("Listening...", "#ffaa00");
+            };
+
+            recognition.onresult = function(event) {
+                const speechResult = event.results[0][0].transcript;
+                updateStatus("Thinking...", "#61afef");
+                processQuery(speechResult);
+            };
+
+            recognition.onerror = function(event) {
+                updateStatus("Didn't catch that", "#e5c07b");
+                stopListeningState();
+            };
+
+            recognition.onend = function() {
+                stopListeningState();
+            };
+
+            recognition.start();
+        }
+
+        function stopListeningState() {
+            isListening = false;
+            document.getElementById("pill").classList.remove("listening");
+        }
+
+        async function processQuery(query) {
+            // Local intent check for mobile actions
+            const lowerQuery = query.toLowerCase();
+            if (lowerQuery.includes("open youtube")) {
+                speakText("Opening YouTube.");
+                window.location.href = "https://www.youtube.com";
+                return;
+            } else if (lowerQuery.includes("open whatsapp")) {
+                speakText("Opening WhatsApp.");
+                window.location.href = "whatsapp://";
+                return;
+            }
+
+            // Call Groq API directly from the mobile browser
+            try {
+                const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": "Bearer YOUR_GROQ_API_KEY_HERE",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        model: "llama-3.3-70b-versatile",
+                        messages: [
+                            { role: "system", content: `You are ${currentPersona}, a punchy, ultra-concise Siri assistant. Keep answers under 2 sentences.` },
+                            { role: "user", content: query }
+                        ]
+                    })
+                });
+
+                const data = await response.json();
+                const answer = data.choices[0].message.content;
+                
+                updateStatus(answer.substring(0, 30) + "...");
+                speakText(answer);
+            } catch (error) {
+                updateStatus("API Error");
+                console.error(error);
+            }
+        }
+
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 1.0;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+    </script>
+</body>
+</html>
